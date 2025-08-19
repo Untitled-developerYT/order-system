@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Kitchen Display</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
+    textarea, input { width: 100%; box-sizing: border-box; padding: 8px; }
+    button { padding: 10px 14px; margin: 6px 0; }
+    #status { padding: 8px; background: #f3f4f6; border-radius: 8px; }
+    ul { padding-left: 18px; }
+    li { margin: 6px 0; }
+    #popup {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
+      align-items:center; justify-content:center; padding: 20px;
+    }
+    #popup .card {
+      background:#fff; max-width: 800px; width: 100%; padding: 16px; border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .muted { color:#6b7280; font-size: 0.9em; }
+    .ok { color:#10b981; }
+    .err { color:#ef4444; }
+    .container {
+            background-color: #ffffff;
+            padding: 32px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 24px;
+            color: #1c1e21;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+        .description {
+            color: #606770;
+            margin-bottom: 24px;
+        }
+        .status-container {
+            margin-bottom: 24px;
+            text-align: left;
+        }
+        .status-box {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background-color: #f7f7f7;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+        .status-box:not(:last-child) { /* Apply margin to all but the last status box */
+            margin-bottom: 12px;
+        }
+        .status-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid #cccccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-right: 12px;
+            font-weight: bold;
+            color: #cccccc;
+        }
+        .status-text {
+            color: #606770;
+        }
+        .status-box.success .status-icon {
+            border-color: #28a745;
+            color: #28a745;
+        }
+        .status-box.success .status-text {
+            color: #155724;
+        }
+        .button {
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #6610f2;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .button:hover {
+            background-color: #5109c3;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .button-reset {
+            margin-top: 12px;
+            background-color: #e9ecef;
+            color: #495057;
+        }
+        .button-reset:hover {
+            background-color: #dae0e5;
+        }
+        .result-container {
+            margin-top: 24px;
+            padding: 16px;
+            background-color: #e2f0e6;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+        }
+        .result-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #155724;
+        }
+        .result-text {
+            word-break: break-all;
+            margin-top: 8px;
+            padding: 8px;
+            background-color: #ffffff;
+            border-radius: 4px;
+            color: #333;
+        }
+        /* Scanner Overlay Styles */
+        #scanner-container {
+            position: fixed;
+            inset: 0;
+            background-color: black;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #scan-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 70vw;
+            height: 70vw;
+            max-width: 400px;
+            max-height: 400px;
+            transform: translate(-50%, -50%);
+            border: 4px solid rgba(255, 255, 255, 0.7);
+            border-radius: 16px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+        }
+        #close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background-color: rgba(255, 255, 255, 0.3);
+            color: white;
+            font-weight: bold;
+            font-size: 24px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            border: none;
+            cursor: pointer;
+        }
+        #scanner-status-text {
+            position: absolute;
+            bottom: 32px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+        /* This class ensures elements are fully hidden */
+        .hidden {
+            display: none !important;
+        }
+  </style>
+</head>
+<body>
+  <h1>Kitchen</h1>
+  <div id="status">Waiting for customer offer…</div>
+
+  <h3>Step 1 — Paste OFFER from customer</h3>
+  <textarea id="offerBox" placeholder="Paste OFFER from customer here"></textarea>
+  <button id="connectBtn">Generate ANSWER</button>
+  
+  <input id="replyInput" placeholder="Reply to customer...">
+  <button id="sendBtn">Send</button>
+  <h3>Incoming Orders</h3>
+  <ul id="orders"></ul>
+
+  <!-- Popup for ANSWER -->
+  <div id="popup">
+    <div class="card">
+      <h3>Your ANSWER (send back to customer)</h3>
+      <textarea id="answerOutput" readonly rows="8"></textarea>
+      <div>
+        <button id="copyAnswerBtn">Copy to Clipboard</button>
+        <button id="closePopupBtn">Close</button>
+      </div>
+      <p class="muted">Share this with the customer device. Keep this page open.</p>
+    </div>
+  </div>
+<div class="container">
+        <h1>Multi-Part QR Scanner</h1>
+        <p class="description">Scan <span id="num-parts-display"></span> QR codes in sequence to combine their data.</p>
+        
+        <div id="status-container-wrapper" class="status-container">
+            </div>
+
+        <button id="scan-btn" class="button">Start Scanning (Part 1)</button>
+        <button id="reset-btn" class="button button-reset hidden">Reset</button>
+
+        <div id="result-container" class="result-container hidden">
+            <h2 class="result-title">Combined Result:</h2>
+            <p id="result-text" class="result-text"></p>
+        </div>
+    </div>
+
+    <div id="scanner-container" class="hidden">
+        <div id="video-container">
+            <video id="video" playsinline></video>
+            <div id="scan-box"></div>
+        </div>
+        <canvas id="canvas" class="hidden"></canvas>
+        <button id="close-btn">&times;</button>
+        <p id="scanner-status-text">Point camera at a QR code</p>
+    </div>
+  <script>
+    // Helpers
+    let channel;
+    const encode = obj => btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+    const decode = str => JSON.parse(decodeURIComponent(escape(atob(str))));
+    function copyText(el) {
+      el.select();
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          return navigator.clipboard.writeText(el.value);
+        } else {
+          document.execCommand('copy');
+          return Promise.resolve();
+        }
+      } catch (e) { return Promise.reject(e); }
+    }
+    function waitForIceComplete(pc) {
+      return new Promise(resolve => {
+        if (pc.iceGatheringState === 'complete') return resolve();
+        function check() {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', check);
+            resolve();
+          }
+        }
+        pc.addEventListener('icegatheringstatechange', check);
+      });
+    }
+
+    // WebRTC setup
+    const pc = new RTCPeerConnection();
+    const $status = document.getElementById('status');
+    const setStatus = (txt, cls) => { $status.className = cls || ''; $status.textContent = txt; };
+
+    pc.ondatachannel = evt => {
+      channel = evt.channel;
+      channel.onmessage = e => {
+        const li = document.createElement('li');
+        li.textContent = 'Order: ' + e.data;
+        document.getElementById('orders').appendChild(li);
+        setStatus('Received an order ✅', 'ok');
+      };
+      channel.onopen = () => setStatus('Connected ✅ Waiting for orders…', 'ok');
+      channel.onclose = () => setStatus('Disconnected ❌', 'err');
+    };
+    
+
+    pc.onconnectionstatechange = () => {
+      const st = pc.connectionState;
+      if (st === 'connected') setStatus('Connected ✅', 'ok');
+      else if (st === 'failed') setStatus('Connection failed ❌', 'err');
+      else setStatus(`Connection state: ${st}`);
+    };
+
+    document.getElementById('connectBtn').onclick = async () => {
+      try {
+        const offerTxt = document.getElementById('offerBox').value.trim();
+        if (!offerTxt) return setStatus('Paste the OFFER first.', 'err');
+        const offer = decode(offerTxt);
+
+        setStatus('Applying offer…');
+        await pc.setRemoteDescription(offer);
+
+        setStatus('Creating answer…');
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        setStatus('Gathering ICE candidates… (wait)');
+        await waitForIceComplete(pc); // IMPORTANT
+        const fullAnswer = pc.localDescription;
+
+        document.getElementById('answerOutput').value = encode(fullAnswer);
+        // Show popup
+        document.getElementById('popup').style.display = 'flex';
+        setStatus('Answer ready. Send it back to customer.');
+      } catch (e) {
+        setStatus('Error generating answer: ' + e.message, 'err');
+        console.error(e);
+      }
+    };
+    
+    document.getElementById("sendBtn").onclick = () => {
+      let msg = document.getElementById("replyInput").value;
+      channel.send(msg);
+      
+
+    };
+    // Popup controls
+    document.getElementById('closePopupBtn').onclick = () => {
+      document.getElementById('popup').style.display = 'none';
+    };
+    document.getElementById('copyAnswerBtn').onclick = () => {
+      copyText(document.getElementById('answerOutput'))
+        .then(() => setStatus('Answer copied ✅'))
+        .catch(() => setStatus('Could not copy (select & copy manually).', 'err'));
+    };
+
+/*omg scanner----------------------------------------------------*/
+// --- CONFIGURATION ---
+        const NUM_PARTS = 10; // <<<<<<<<<<<<<<< CONFIGURE THE NUMBER OF PARTS HERE
+        // -------------------
+
+        let scannedData = new Array(NUM_PARTS).fill(null);
+        let currentPartToScanIndex = 0; // 0-indexed
+
+        const scanBtn = document.getElementById('scan-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const closeBtn = document.getElementById('close-btn');
+        const scannerContainer = document.getElementById('scanner-container');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const scannerStatusText = document.getElementById('scanner-status-text');
+        const statusContainerWrapper = document.getElementById('status-container-wrapper');
+        const resultContainer = document.getElementById('result-container');
+        const resultText = document.getElementById('result-text');
+        const otherResultText = document.getElementById('offerBox');
+        const numPartsDisplay = document.getElementById('num-parts-display');
+
+        let stream;
+
+        // Initialize UI on load
+        document.addEventListener('DOMContentLoaded', () => {
+            numPartsDisplay.textContent = NUM_PARTS;
+            createStatusBoxes();
+            resetScanner();
+        });
+
+        scanBtn.addEventListener('click', startScanner);
+        resetBtn.addEventListener('click', resetScanner);
+        closeBtn.addEventListener('click', stopScanner);
+        
+        function createStatusBoxes() {
+            statusContainerWrapper.innerHTML = ''; // Clear existing
+            for (let i = 0; i < NUM_PARTS; i++) {
+                const statusBox = document.createElement('div');
+                statusBox.id = `part${i + 1}-status`;
+                statusBox.classList.add('status-box');
+                
+                const statusIcon = document.createElement('div');
+                statusIcon.classList.add('status-icon');
+                statusIcon.textContent = i + 1;
+                
+                const statusText = document.createElement('span');
+                statusText.classList.add('status-text');
+                statusText.textContent = `Part ${i + 1}: Awaiting scan...`;
+                
+                statusBox.appendChild(statusIcon);
+                statusBox.appendChild(statusText);
+                statusContainerWrapper.appendChild(statusBox);
+            }
+        }
+
+        function resetScanner() {
+            scannedData.fill(null);
+            currentPartToScanIndex = 0;
+            combinedData = null;
+
+            for (let i = 0; i < NUM_PARTS; i++) {
+                updateStatusUI(i + 1, 'Awaiting scan...', false);
+            }
+            
+            scanBtn.textContent = `Start Scanning (Part ${currentPartToScanIndex + 1})`;
+            scanBtn.disabled = false;
+            resetBtn.classList.add('hidden');
+            resultContainer.classList.add('hidden');
+        }
+
+        async function startScanner() {
+            scannerContainer.classList.remove('hidden');
+            scannerStatusText.textContent = `Point camera at QR Code for Part ${currentPartToScanIndex + 1}`;
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true);
+                video.play();
+                requestAnimationFrame(tick);
+            } catch (err) {
+                console.error("Camera Error:", err);
+                stopScanner();
+                scannerStatusText.textContent = "Error: Could not access camera.";
+            }
+        }
+
+        function stopScanner() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            scannerContainer.classList.add('hidden');
+        }
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+                if (code) {
+                    handleQRCode(code.data);
+                } else {
+                    requestAnimationFrame(tick);
+                }
+            } else {
+                requestAnimationFrame(tick);
+            }
+        }
+
+        function handleQRCode(data) {
+            // Check if this part has already been scanned to prevent rescanning the same part immediately
+            if (scannedData[currentPartToScanIndex] === data) {
+                 requestAnimationFrame(tick); // Keep scanning if it's the same data
+                 return;
+            }
+
+            stopScanner(); // Stop scanner after every new successful scan
+
+            scannedData[currentPartToScanIndex] = data;
+            updateStatusUI(currentPartToScanIndex + 1, `Part ${currentPartToScanIndex + 1} Scanned!`, true);
+            console.log(`Part ${currentPartToScanIndex + 1} Scanned:`, data);
+            
+            currentPartToScanIndex++;
+
+            if (currentPartToScanIndex < NUM_PARTS) {
+                // Not all parts scanned yet, prepare for next scan
+                scanBtn.textContent = `Scan Part ${currentPartToScanIndex + 1}`;
+                scanBtn.disabled = false;
+                resetBtn.classList.add('hidden'); // Keep reset hidden until all parts are done
+            } else {
+                // All parts scanned
+                combineAndShowResult();
+            }
+        }
+
+        function combineAndShowResult() {
+            combinedData = scannedData.join(''); // Joins all scanned data strings
+            
+            console.log("Combined Data:", combinedData);
+            resultText.textContent = combinedData;
+            resultContainer.classList.remove('hidden');
+            otherResultText.textContent = combinedData; // Assuming you have another element to show the result
+            scanBtn.textContent = 'All Parts Scanned!';
+            scanBtn.disabled = true;
+            resetBtn.classList.remove('hidden');
+        }
+
+        function updateStatusUI(partNumber, text, isSuccess) {
+            const statusEl = document.getElementById(`part${partNumber}-status`);
+            if (!statusEl) return; // Guard against non-existent elements
+
+            const iconEl = statusEl.querySelector('.status-icon');
+            const textEl = statusEl.querySelector('.status-text');
+
+            textEl.textContent = text;
+            if (isSuccess) {
+                statusEl.classList.add('success');
+                iconEl.innerHTML = '&#10003;'; // Checkmark
+            } else {
+                statusEl.classList.remove('success');
+                iconEl.textContent = partNumber;
+            }
+        }
+
+
+   
+
+  </script>
+</body>
+</html>
