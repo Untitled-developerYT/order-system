@@ -187,6 +187,80 @@
         .hidden {
             display: none !important;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8); /* Darken background for full-screen effect */
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            width: 100%;
+            height: 100%;
+            padding: 1.5rem;
+            position: relative;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        /* New styling for the normal exit button */
+        
+        /* Styles for the carousel */
+        .carousel-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+            justify-content: center;
+        }
+        .carousel-slides {
+            display: flex;
+            transition: transform 0.5s ease-in-out;
+            width: 100%;
+            height: 100%;
+        }
+        .carousel-slide {
+            min-width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .qrcode-wrapper {
+            width: 80%;
+            max-width: 300px;
+            aspect-ratio: 1; /* Keep a 1:1 aspect ratio */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* New: Styles for horizontally scrollable navigation */
+        
+        
+        
+        /* Desktop/larger screens adjustments */
+        @media (min-width: 768px) {
+            .modal-content {
+                width: 90%;
+                max-width: 500px;
+                height: auto;
+                border-radius: 12px;
+                padding: 2rem;
+            }
+        }
   </style>
 </head>
 <body>
@@ -209,11 +283,26 @@
       <textarea id="answerOutput" readonly rows="8"></textarea>
       <div>
         <button id="copyAnswerBtn">Copy to Clipboard</button>
+        <button id="generateQRCodeBtn">Generate QR Code</button>
         <button id="closePopupBtn">Close</button>
       </div>
       <p class="muted">Share this with the customer device. Keep this page open.</p>
     </div>
   </div>
+  <div id="qr-modal" class="modal">
+        <div class="modal-content">
+            <div class="carousel-container">
+                <div id="carousel-slides" class="carousel-slides">
+                    <!-- QR codes will be dynamically added here -->
+                </div>
+            </div>
+            <div id="carousel-nav">
+                <button id="prev-btn">Previous</button>
+                <button id="next-btn">Next</button>
+            </div>
+            <button class="close-btn">Exit</button>
+        </div>
+    </div>
 <div class="container">
         <h1>Multi-Part QR Scanner</h1>
         <p class="description">Scan <span id="num-parts-display"></span> QR codes in sequence to combine their data.</p>
@@ -506,7 +595,148 @@
         }
 
 
-   
+   const generateBtn = document.getElementById('generateQRCodeBtn');
+        const textInput = document.getElementById('answerOutput');
+        
+        // Modal elements
+        const qrModal = document.getElementById('qr-modal');
+        const modalCloseBtn = document.querySelector('.close-btn');
+        const carouselSlides = document.getElementById('carousel-slides');
+        const carouselNav = document.getElementById('carousel-nav');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        let currentSlide = 0;
+        let qrData = [];
+
+        /**
+         * Splits a string into a specified number of approximately equal parts.
+         * @param {string} str The string to split.
+         * @param {number} parts The number of parts to split the string into.
+         * @returns {string[]} An array containing the parts of the string.
+         */
+        function splitStringIntoNParts(str, parts) {
+            const result = [];
+            if (parts <= 0) return result;
+            const chunkSize = Math.ceil(str.length / parts);
+            for (let i = 0; i < str.length; i += chunkSize) {
+                result.push(str.slice(i, i + chunkSize));
+            }
+            return result;
+        }
+
+        /**
+         * Updates the active state of the navigation buttons.
+         */
+        
+
+        /**
+         * Moves the carousel to a specific slide.
+         * @param {number} slideIndex The index of the slide to show.
+         */
+        function showSlide(slideIndex) {
+            currentSlide = slideIndex;
+            carouselSlides.style.transform = `translateX(-${currentSlide * 100}%)`;
+        }
+
+        /**
+         * Generates and displays the QR codes in the carousel.
+         * @param {string} text The string to generate QR codes from.
+         */
+        function generateQRCodeAndShowPopup(text) {
+            const splitCount = parseInt(10, 10);
+            
+            if (!text || text.trim() === '') {
+                carouselSlides.innerHTML = '<p style="color:#dc3545; text-align:center;">Please provide some text.</p>';
+                carouselNav.innerHTML = '';
+                qrModal.style.display = 'flex';
+                return;
+            }
+
+            if (isNaN(splitCount) || splitCount < 1 || splitCount > 10) {
+                carouselSlides.innerHTML = '<p style="color:#dc3545; text-align:center;">Please enter a valid number of QR codes (1-10).</p>';
+                carouselNav.innerHTML = '';
+                qrModal.style.display = 'flex';
+                return;
+            }
+
+            // Clear previous content
+            carouselSlides.innerHTML = '';
+            
+            currentSlide = 0;
+            qrData = splitStringIntoNParts(text, splitCount);
+
+            // Dynamically create slides and QR codes for each half
+            qrData.forEach((part, index) => {
+                const slideDiv = document.createElement('div');
+                slideDiv.className = 'carousel-slide';
+
+                const titleP = document.createElement('p');
+                titleP.textContent = `QR Code ${index + 1} of ${qrData.length}`;
+                titleP.style.fontSize = '1.2rem';
+                titleP.style.fontWeight = 'bold';
+                slideDiv.appendChild(titleP);
+
+                // Create a responsive wrapper for the QR code
+                const qrcodeWrapper = document.createElement('div');
+                qrcodeWrapper.className = 'qrcode-wrapper';
+                slideDiv.appendChild(qrcodeWrapper);
+
+                carouselSlides.appendChild(slideDiv);
+
+                // Generate the QR code within the wrapper
+                new QRCode(qrcodeWrapper, {
+                    text: part,
+                    width: 200,
+                    height: 200,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            });
+
+            // Create numbered navigation buttons
+            
+
+            // Show the modal and set initial state
+            qrModal.style.display = 'flex';
+            showSlide(0); // Show the first slide by default
+        }
+
+        /**
+         * Hides the popup modal.
+         */
+        function hideModal() {
+            qrModal.style.display = 'none';
+        }
+
+        // Add event listeners
+        closeBtn.addEventListener('click', hideModal);
+        prevBtn.addEventListener('click', () => {
+            let newIndex = currentSlide - 1;
+            if (newIndex < 0) {
+                newIndex = qrData.length - 1; // Wrap around to the last slide
+            }
+            showSlide(newIndex);
+        });
+
+        nextBtn.addEventListener('click', () => {
+            let newIndex = currentSlide + 1;
+            if (newIndex >= qrData.length) {
+                newIndex = 0; // Wrap around to the first slide
+            }
+            showSlide(newIndex);
+        });
+        // Hide the modal when clicking outside of it
+        window.addEventListener('click', (event) => {
+            if (event.target === qrModal) {
+                hideModal();
+            }
+        });
+
+        // Event listener to call the new function when the button is clicked
+        generateBtn.addEventListener('click', () => {
+            generateQRCodeAndShowPopup(textInput.value);
+        });
 
   </script>
 </body>
