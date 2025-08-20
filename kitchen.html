@@ -301,7 +301,7 @@
                 <button id="prev-btn">Previous</button>
                 <button id="next-btn">Next</button>
             </div>
-            <button class="close-btn">Exit</button>
+            <button class="modal-close-btn">Exit</button>
         </div>
     </div>
 <div class="container">
@@ -601,7 +601,7 @@
         
         // Modal elements
         const qrModal = document.getElementById('qr-modal');
-        const modalCloseBtn = document.querySelector('.close-btn');
+        const modalCloseBtn = document.querySelector('modal-close-btn');
         const carouselSlides = document.getElementById('carousel-slides');
         const carouselNav = document.getElementById('carousel-nav');
         const prevBtn = document.getElementById('prev-btn');
@@ -711,7 +711,7 @@
         }
 
         // Add event listeners
-        closeBtn.addEventListener('click', hideModal);
+        modalCloseBtn.addEventListener('click', hideModal);
         prevBtn.addEventListener('click', () => {
             let newIndex = currentSlide - 1;
             if (newIndex < 0) {
