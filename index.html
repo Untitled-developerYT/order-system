@@ -334,7 +334,7 @@ button:hover {
             <textarea id="answerBox" placeholder="Paste ANSWER here"></textarea>
             <div style="display: flex; justify-content: space-between; margin-top: 10px;">
                 <button id="scan-btn">Scan QR Code</button>
-                <button id="reset-btn" class="hidden">Reset Scanner</button>
+                <button id="reset-btn">Reset Scanner</button>
                 <button id="applyAnswerBtn">Apply Answer</button>
             </div>
             <p><button id="closePopupBtn">Close Setup</button></p>
@@ -722,7 +722,7 @@ button:hover {
             
             scanBtn.textContent = `Start Scanning (Part ${currentPartToScanIndex + 1})`;
             scanBtn.disabled = false;
-            resetBtn.classList.add('hidden');
+            
             
         }
 
