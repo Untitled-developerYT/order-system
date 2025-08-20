@@ -2,10 +2,74 @@
 <html lang="en">
 <head>
   <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  
   <meta charset="utf-8" />
   <title>Customer Order</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
+    
+        /* Scanner Overlay Styles */
+        #scanner-container {
+            position: fixed;
+            inset: 0;
+            background-color: black;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        #video-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #scan-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 70vw;
+            height: 70vw;
+            max-width: 400px;
+            max-height: 400px;
+            transform: translate(-50%, -50%);
+            border: 4px solid rgba(255, 255, 255, 0.7);
+            border-radius: 16px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+        }
+        #close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background-color: rgba(255, 255, 255, 0.3);
+            color: white;
+            font-weight: bold;
+            font-size: 24px;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            border: none;
+            cursor: pointer;
+        }
+        #scanner-status-text {
+            position: absolute;
+            bottom: 32px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+        /* This class ensures elements are fully hidden */
+        .hidden {
+            display: none !important;
+        }
     h1 { margin-bottom: 0; }
     #status { margin: 8px 0 16px; padding: 10px; border-radius: 8px; background:#e5e7eb; }
     .ok { background:#d1fae5; color:#065f46; }
@@ -236,43 +300,48 @@ button:hover {
   </style>
 </head>
 <body>
-  <h1>Customer Ordering</h1>
-  <div id="status">Not connected</div>
+    <h1>Customer Ordering</h1>
+    <div id="status">Not connected</div>
 
-  <div id="orderArea" style="display:none;">
-    <input id="orderInput" placeholder='e.g. "Customer ordered extra peas"' />
-    <button id="sendBtn">Send Order</button>
-    <ul id="orders"></ul>
-  </div>
- <div id="confirmationBanner" class="topBanner">Form submitted successfully!</div>
- <div id="incompleteBanner" class="topBanner">Please complete all required questions!</div>
-
- <div class="container">
-    <h2>Available Forms</h2>
-    <div id="formsContainer"></div>
- </div>
-  <!-- Setup Popup -->
-  <div id="popup">
-    <div class="card">
-      <h2>Connection Setup</h2>
-      <p>Step 1: Copy this OFFER and give it to the Kitchen:</p>
-      <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-        <textarea id="offerOutput" readonly></textarea>
-        <div><div id="qrcode" ></div></div>
-      </div>
-      <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-        <button id="copyOfferBtn">Copy Offer</button>
-        <button id="generateQRCodeBtn">Generate QR Code</button>
-      </div>
-      
-      <p>Step 2: Paste the ANSWER from Kitchen here:</p>
-      <textarea id="answerBox" placeholder="Paste ANSWER here"></textarea>
-      <button id="applyAnswerBtn">Apply Answer</button>
-
-      <p><button id="closePopupBtn">Close Setup</button></p>
+    <div id="orderArea" style="display:none;">
+        <input id="orderInput" placeholder='e.g. "Customer ordered extra peas"' />
+        <button id="sendBtn">Send Order</button>
+        <ul id="orders"></ul>
     </div>
-  </div>
-  <div id="qr-modal" class="modal">
+    <div id="confirmationBanner" class="topBanner">Form submitted successfully!</div>
+    <div id="incompleteBanner" class="topBanner">Please complete all required questions!</div>
+
+    <div class="container">
+        <h2>Available Forms</h2>
+        <div id="formsContainer"></div>
+    </div>
+  <!-- Setup Popup -->
+    <div id="popup">
+        <div class="card">
+            <h2>Connection Setup</h2>
+            <p>Step 1: Copy this OFFER and give it to the Kitchen:</p>
+            <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+                <textarea id="offerOutput" readonly></textarea>
+                <div><div id="qrcode" ></div></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+                <button id="copyOfferBtn">Copy Offer</button>
+                <button id="generateQRCodeBtn">Generate QR Code</button>
+            </div>
+      
+            <p>Step 2: Paste the ANSWER from Kitchen here:</p>
+            <textarea id="answerBox" placeholder="Paste ANSWER here"></textarea>
+            <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+                <button id="scan-btn">Scan QR Code</button>
+                <button id="reset-btn" class="hidden">Reset Scanner</button>
+                <button id="applyAnswerBtn">Apply Answer</button>
+            </div>
+            <p><button id="closePopupBtn">Close Setup</button></p>
+        </div>
+    </div>
+<!-- end of setup-->
+  
+    <div id="qr-modal" class="modal">
         <div class="modal-content">
             <div class="carousel-container">
                 <div id="carousel-slides" class="carousel-slides">
@@ -286,180 +355,179 @@ button:hover {
             <button class="close-btn">Exit</button>
         </div>
     </div>
-  <script>
-    // Helpers
-    let jsonForms
-    const encode = obj => btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
-    const decode = str => JSON.parse(decodeURIComponent(escape(atob(str))));
-    function waitForIceComplete(pc) {
-      return new Promise(resolve => {
-        if (pc.iceGatheringState === 'complete') return resolve();
-        pc.addEventListener('icegatheringstatechange', function check() {
-          if (pc.iceGatheringState === 'complete') {
-            pc.removeEventListener('icegatheringstatechange', check);
-            resolve();
-          }
-        });
-      });
-    }
-    function setStatus(msg, cls="") {
-      const el = document.getElementById("status");
-      el.className = cls;
-      el.textContent = msg;
-    }
-
-    // WebRTC setup
-    let pc = new RTCPeerConnection();
-    let channel = pc.createDataChannel("orders");
-
-    channel.onopen = () => {
-      setStatus("Connected ✅ Ready to send orders", "ok");
-      document.getElementById("orderArea").style.display = "block";
-    };
-    channel.onclose = () => setStatus("Disconnected ❌", "err");
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed") setStatus("Connection failed ❌", "err");
-    };
-
-    // Send order
-    document.getElementById("sendBtn").onclick = () => {
-      let msg = document.getElementById("orderInput").value.trim();
-      if (!msg) return;
-      channel.send(msg);
-      document.getElementById("orders").appendChild(li);
-      document.getElementById("orderInput").value = "";
-    };
-
-    // Setup popup
-    const popup = document.getElementById("popup");
-    document.getElementById("closePopupBtn").onclick = () => popup.style.display="none";
-
-    async function initOffer() {
-      setStatus("Creating offer…");
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await waitForIceComplete(pc);
-      document.getElementById("offerOutput").value = encode(pc.localDescription);
-      popup.style.display = "flex";
-      setStatus("Share the OFFER with Kitchen, then paste their Answer.");
-    }
-
-    document.getElementById("copyOfferBtn").onclick = () => {
-      document.getElementById("offerOutput").select();
-      document.execCommand("copy");
-      setStatus("Offer copied ✅ Share it with Kitchen", "ok");
-    };
-
-    document.getElementById("applyAnswerBtn").onclick = async () => {
-      try {
-        const txt = document.getElementById("answerBox").value.trim();
-        if (!txt) return;
-        const answer = decode(txt);
-        await pc.setRemoteDescription(answer);
-        localStorage.setItem("kitchenAnswer", txt); // save for future
-        setStatus("Answer applied, connecting…");
-        popup.style.display = "none";
-      } catch(e) {
-        setStatus("Invalid Answer ❌", "err");
-      }
-    };
-
-    // Auto-load saved Answer if available
-  initOffer();
-  channel.onmessage = e => {
-    jsonForms = e.data
-    loadForms();
-      
-    };
-//this new thing
-function loadForms() {
-    const container = document.getElementById('formsContainer');
-    container.innerHTML = '';
-    console.log(jsonForms);
-    const forms = JSON.parse(jsonForms || '[]');
-    if(forms.length === 0) {
-        container.innerHTML = '<p>No forms available.</p>';
-        return;
-    }
-
-    forms.forEach((form, idx) => {
-        const formEl = document.createElement('form');
-        formEl.id = `form_${idx}`;
-        formEl.innerHTML = `<h3>${form.title}</h3>`;
-
-        form.questions.forEach(q => {
-            let qHtml = '';
-            if(q.type === 'text') {
-                qHtml = `<p class="question-title">${q.text}</p><input type="text" id="${q.id}" required>`;
-            } else if(q.type === 'textarea') {
-                qHtml = `<p class="question-title">${q.text}</p><textarea id="${q.id}" rows="4" required></textarea>`;
-            } else if(q.type === 'mc') {
-                qHtml = `<p class="question-title">${q.text}</p>`;
-                q.options.forEach((o, index) => {
-                    const requiredAttr = index===0?'required':'';
-                    qHtml += `<label class="mc-option"><input type="radio" name="${q.id}" value="${o}" ${requiredAttr}><span>${o}</span></label>`;
+    <script>
+        // Helpers
+        let jsonForms
+        const encode = obj => btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+        const decode = str => JSON.parse(decodeURIComponent(escape(atob(str))));
+        function waitForIceComplete(pc) {
+            return new Promise(resolve => {
+                if (pc.iceGatheringState === 'complete') return resolve();
+                pc.addEventListener('icegatheringstatechange', function check() {
+                    if (pc.iceGatheringState === 'complete') {
+                        pc.removeEventListener('icegatheringstatechange', check);
+                        resolve();
+                    }
                 });
+            });
+        }
+        function setStatus(msg, cls="") {
+            const el = document.getElementById("status");
+            el.className = cls;
+            el.textContent = msg;
+        }
+
+        // WebRTC setup
+        let pc = new RTCPeerConnection();
+        let channel = pc.createDataChannel("orders");
+
+        channel.onopen = () => {
+            setStatus("Connected ✅ Ready to send orders", "ok");
+            document.getElementById("orderArea").style.display = "block";
+        };
+        channel.onclose = () => setStatus("Disconnected ❌", "err");
+
+        pc.onconnectionstatechange = () => {
+            if (pc.connectionState === "failed") setStatus("Connection failed ❌", "err");
+        };
+
+        // Send order
+        document.getElementById("sendBtn").onclick = () => {
+            let msg = document.getElementById("orderInput").value.trim();
+            if (!msg) return;
+            channel.send(msg);
+            document.getElementById("orders").appendChild(li);
+            document.getElementById("orderInput").value = "";
+        };
+
+        // Setup popup
+        const popup = document.getElementById("popup");
+        document.getElementById("closePopupBtn").onclick = () => popup.style.display="none";
+
+        async function initOffer() {
+            setStatus("Creating offer…");
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            await waitForIceComplete(pc);
+            document.getElementById("offerOutput").value = encode(pc.localDescription);
+            popup.style.display = "flex";
+            setStatus("Share the OFFER with Kitchen, then paste their Answer.");
+        }
+
+        document.getElementById("copyOfferBtn").onclick = () => {
+            document.getElementById("offerOutput").select();
+            document.execCommand("copy");
+            setStatus("Offer copied ✅ Share it with Kitchen", "ok");
+        };
+
+        document.getElementById("applyAnswerBtn").onclick = async () => {
+            try {
+                const txt = document.getElementById("answerBox").value.trim();
+                if (!txt) return;
+                const answer = decode(txt);
+                await pc.setRemoteDescription(answer);
+                localStorage.setItem("kitchenAnswer", txt); // save for future
+                setStatus("Answer applied, connecting…");
+                popup.style.display = "none";
+            } catch(e) {
+                setStatus("Invalid Answer ❌", "err");
             }
-            formEl.innerHTML += qHtml;
-        });
+        };
 
-        formEl.innerHTML += `<button type="button" onclick="submitForm(${idx})">Submit</button>`;
-        container.appendChild(formEl);
-    });
-}
+        // Auto-load saved Answer if available
+        initOffer();
+        channel.onmessage = e => {
+            jsonForms = e.data
+            loadForms();
+        };
+        //this new thing
+        function loadForms() {
+            const container = document.getElementById('formsContainer');
+            container.innerHTML = '';
+            console.log(jsonForms);
+            const forms = JSON.parse(jsonForms || '[]');
+            if(forms.length === 0) {
+                container.innerHTML = '<p>No forms available.</p>';
+                return;
+            }
 
-function submitForm(idx) {
-    const formEl = document.getElementById(`form_${idx}`);
+            forms.forEach((form, idx) => {
+                const formEl = document.createElement('form');
+                formEl.id = `form_${idx}`;
+                formEl.innerHTML = `<h3>${form.title}</h3>`;
 
-    // Custom validation
-    const requiredInputs = formEl.querySelectorAll('input[required], textarea[required]');
-    let allValid = true;
-    requiredInputs.forEach(input => {
-        if(input.type==='radio') {
-            const checked = formEl.querySelector(`input[name="${input.name}"]:checked`);
-            if(!checked) allValid = false;
-        } else if(!input.value.trim()) allValid = false;
-    });
+                form.questions.forEach(q => {
+                    let qHtml = '';
+                    if(q.type === 'text') {
+                        qHtml = `<p class="question-title">${q.text}</p><input type="text" id="${q.id}" required>`;
+                    } else if(q.type === 'textarea') {
+                        qHtml = `<p class="question-title">${q.text}</p><textarea id="${q.id}" rows="4" required></textarea>`;
+                    } else if(q.type === 'mc') {
+                        qHtml = `<p class="question-title">${q.text}</p>`;
+                        q.options.forEach((o, index) => {
+                            const requiredAttr = index===0?'required':'';
+                            qHtml += `<label class="mc-option"><input type="radio" name="${q.id}" value="${o}" ${requiredAttr}><span>${o}</span></label>`;
+                        });
+                    }
+                    formEl.innerHTML += qHtml;
+                });
 
-    if(!allValid) {
-        showBanner('incompleteBanner');
-        return;
-    }
+                formEl.innerHTML += `<button type="button" onclick="submitForm(${idx})">Submit</button>`;
+                container.appendChild(formEl);
+            });
+        }
 
-    // Collect answers
-    const answerJSON = {};
-    const forms = JSON.parse(jsonForms || '[]');
-    const currentForm = forms[idx];
+        function submitForm(idx) {
+            const formEl = document.getElementById(`form_${idx}`);
 
-    currentForm.questions.forEach(q=>{
-        const el = document.getElementById(q.id) || formEl.querySelector(`input[name="${q.id}"]:checked`);
-        if(!el) return;
-        const value = (el.type==='radio') ? el.value : el.value;
-        answerJSON[q.text] = value;
-    });
-    channel.send(JSON.stringify(answerJSON, null, 2))
-    console.log("Form submission JSON:", JSON.stringify(answerJSON, null, 2));
-    formEl.reset();
-    showBanner('confirmationBanner');
-}
+            // Custom validation
+            const requiredInputs = formEl.querySelectorAll('input[required], textarea[required]');
+            let allValid = true;
+            requiredInputs.forEach(input => {
+                if(input.type==='radio') {
+                    const checked = formEl.querySelector(`input[name="${input.name}"]:checked`);
+                    if(!checked) allValid = false;
+                } else if(!input.value.trim()) allValid = false;
+            });
 
-function showBanner(id){
-    const banner = document.getElementById(id);
-    banner.style.display='block';
-    banner.style.opacity='1';
-    setTimeout(()=>{
-        banner.style.opacity='0';
-        setTimeout(()=>banner.style.display='none',300);
-    },3000);
-}
+            if(!allValid) {
+                showBanner('incompleteBanner');
+                return;
+            }
+
+            // Collect answers
+            const answerJSON = {};
+            const forms = JSON.parse(jsonForms || '[]');
+            const currentForm = forms[idx];
+
+            currentForm.questions.forEach(q=>{
+                const el = document.getElementById(q.id) || formEl.querySelector(`input[name="${q.id}"]:checked`);
+                if(!el) return;
+                const value = (el.type==='radio') ? el.value : el.value;
+                answerJSON[q.text] = value;
+            });
+            channel.send(JSON.stringify(answerJSON, null, 2))
+            console.log("Form submission JSON:", JSON.stringify(answerJSON, null, 2));
+            formEl.reset();
+            showBanner('confirmationBanner');
+        }
+
+        function showBanner(id){
+            const banner = document.getElementById(id);
+            banner.style.display='block';
+            banner.style.opacity='1';
+            setTimeout(()=>{
+                banner.style.opacity='0';
+                setTimeout(()=>banner.style.display='none',300);
+            },3000);
+        }
 
 
 
 
 
-  // QR Code Modal Logic
-  const generateBtn = document.getElementById('generateQRCodeBtn');
+        // QR Code Modal Logic
+        const generateBtn = document.getElementById('generateQRCodeBtn');
         const textInput = document.getElementById('offerOutput');
         
         // Modal elements
@@ -601,7 +669,151 @@ function showBanner(id){
         generateBtn.addEventListener('click', () => {
             generateQRCodeAndShowPopup(textInput.value);
         });
+        // new scanner logic------------------------------------------------------------
+        // --- CONFIGURATION ---
+        const NUM_PARTS = 10; // <<<<<<<<<<<<<<< CONFIGURE THE NUMBER OF PARTS HERE
+        // -------------------
 
-  </script>
+        let scannedData = new Array(NUM_PARTS).fill(null);
+        let currentPartToScanIndex = 0; // 0-indexed
+
+        const scanBtn = document.getElementById('scan-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const scanCloseBtn = document.getElementById('close-btn');
+        const scannerContainer = document.getElementById('scanner-container');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const scannerStatusText = document.getElementById('scanner-status-text');
+        
+        const resultText = document.getElementById('answerBox');
+        
+
+        let stream;
+
+        // Initialize UI on load
+        document.addEventListener('DOMContentLoaded', () => {            
+            resetScanner();
+        });
+
+        scanBtn.addEventListener('click', startScanner);
+        resetBtn.addEventListener('click', resetScanner);
+        scanCloseBtn.addEventListener('click', stopScanner);
+        
+        
+
+        function resetScanner() {
+            scannedData.fill(null);
+            currentPartToScanIndex = 0;
+            combinedData = null;
+
+            for (let i = 0; i < NUM_PARTS; i++) {
+                updateStatusUI(i + 1, 'Awaiting scan...', false);
+            }
+            
+            scanBtn.textContent = `Start Scanning (Part ${currentPartToScanIndex + 1})`;
+            scanBtn.disabled = false;
+            resetBtn.classList.add('hidden');
+            
+        }
+
+        async function startScanner() {
+            scannerContainer.classList.remove('hidden');
+            scannerStatusText.textContent = `Point camera at QR Code for Part ${currentPartToScanIndex + 1}`;
+
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true);
+                video.play();
+                requestAnimationFrame(tick);
+            } catch (err) {
+                console.error("Camera Error:", err);
+                stopScanner();
+                scannerStatusText.textContent = "Error: Could not access camera.";
+            }
+        }
+
+        function stopScanner() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            scannerContainer.classList.add('hidden');
+        }
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+                if (code) {
+                    handleQRCode(code.data);
+                } else {
+                    requestAnimationFrame(tick);
+                }
+            } else {
+                requestAnimationFrame(tick);
+            }
+        }
+
+        function handleQRCode(data) {
+            // Check if this part has already been scanned to prevent rescanning the same part immediately
+            if (scannedData[currentPartToScanIndex] === data) {
+                 requestAnimationFrame(tick); // Keep scanning if it's the same data
+                 return;
+            }
+
+            stopScanner(); // Stop scanner after every new successful scan
+
+            scannedData[currentPartToScanIndex] = data;
+            updateStatusUI(currentPartToScanIndex + 1, `Part ${currentPartToScanIndex + 1} Scanned!`, true);
+            console.log(`Part ${currentPartToScanIndex + 1} Scanned:`, data);
+            
+            currentPartToScanIndex++;
+
+            if (currentPartToScanIndex < NUM_PARTS) {
+                // Not all parts scanned yet, prepare for next scan
+                scanBtn.textContent = `Scan Part ${currentPartToScanIndex + 1}`;
+                scanBtn.disabled = false;
+                resetBtn.classList.add('hidden'); // Keep reset hidden until all parts are done
+            } else {
+                // All parts scanned
+                combineAndShowResult();
+            }
+        }
+
+        function combineAndShowResult() {
+            combinedData = scannedData.join(''); // Joins all scanned data strings
+            
+            console.log("Combined Data:", combinedData);
+            resultText.textContent = combinedData;
+            
+            
+            scanBtn.textContent = 'All Parts Scanned!';
+            scanBtn.disabled = true;
+            resetBtn.classList.remove('hidden');
+        }
+
+        function updateStatusUI(partNumber, text, isSuccess) {
+            const statusEl = document.getElementById(`part${partNumber}-status`);
+            if (!statusEl) return; // Guard against non-existent elements
+
+            const iconEl = statusEl.querySelector('.status-icon');
+            const textEl = statusEl.querySelector('.status-text');
+
+            textEl.textContent = text;
+            if (isSuccess) {
+                statusEl.classList.add('success');
+                iconEl.innerHTML = '&#10003;'; // Checkmark
+            } else {
+                statusEl.classList.remove('success');
+                iconEl.textContent = partNumber;
+            }
+        }
+    </script>
 </body>
 </html>
