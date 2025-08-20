@@ -340,7 +340,15 @@ button:hover {
         </div>
     </div>
 <!-- end of setup-->
-  
+    <div id="scanner-container" class="hidden">
+        <div id="video-container">
+            <video id="video" playsinline></video>
+            <div id="scan-box"></div>
+        </div>
+        <canvas id="canvas" class="hidden"></canvas>
+        <button id="close-btn">&times;</button>
+        <p id="scanner-status-text">Point camera at a QR code</p>
+    </div>
     <div id="qr-modal" class="modal">
         <div class="modal-content">
             <div class="carousel-container">
