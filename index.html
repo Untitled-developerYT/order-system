@@ -367,18 +367,6 @@ button:hover {
         </div>
     </div>
     <script>
-        // reconect to the kitchen
-        document.getElementById("reconnectBtn").onclick = () => {
-            if (!pc) {
-                console.log("No PeerConnection, please redo setup.");
-                return;
-            }
-            if (!channel || channel.readyState !== "open") {
-                channel = pc.createDataChannel("orders");
-                channel.onopen = () => document.getElementById("status").innerText = "Reconnected ✅";
-                channel.onclose = () => document.getElementById("status").innerText = "Disconnected ❌";
-            }
-        };
 
 
 
